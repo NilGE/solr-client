@@ -42,6 +42,7 @@ jspm_packages
 public/bundle.js
 public/bundle.js.map
 public/style.css
+public/CNNDownloadData
 
 # Images
 server/media

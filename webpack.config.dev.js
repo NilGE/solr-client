@@ -1,4 +1,3 @@
-
 import webpack from 'webpack';
 
 export default {
@@ -19,6 +18,11 @@ export default {
   ],
   module: {
     loaders: [
+      {
+				test: /\.json$/,
+				include: __dirname + '/client',
+				loader: 'json-loader'
+			},
       {
         test: /\.js$/,
         exclude: /node_modules/,

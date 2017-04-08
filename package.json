@@ -1,5 +1,5 @@
 {
-  "name": "solr-client",
+  "name": "solr-node-client",
   "version": "1.0.0",
   "description": "solr-node-client practice",
   "main": "webpack.config.dev.js",
@@ -33,9 +33,13 @@
     "webpack-hot-middleware": "^2.17.1"
   },
   "dependencies": {
+    "body-parser": "^1.17.1",
     "ejs": "^2.5.6",
     "express": "^4.15.2",
+    "json-loader": "^0.5.4",
     "react": "^15.4.2",
-    "react-dom": "^15.4.2"
+    "react-dom": "^15.4.2",
+    "solrjs": "^0.7.0",
+    "solwr": "^0.1.2"
   }
 }
