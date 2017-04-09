@@ -29,52 +29,6 @@ class App extends React.Component {
     }).catch(err => console.error(err));
   }
 
-  componentDidMount() {
-    this.compareResult();
-  }
-
-  compareResult() {
-    let solr = this.state.solr;
-
-    let queries = ["Brexit", "NASDAQ", "NBA", "Snapchat", "Illegal Immigration", "Donald Trump", "Russia", "NASA"];
-    let promises_tfidf = [];
-    let promises_pgrank = [];
-
-    queries.map(query => {
-      promises_tfidf.push(solr.find(query).fieldlist("id").exec());
-      promises_pgrank.push(solr.find(query).fieldlist("id").sort("pageRankFile desc").exec());
-    });
-
-    axios.all(promises_tfidf).then(() => {
-      axios.all(promises_pgrank).then(() => {
-
-        for (let i = 0; i < promises_pgrank.length; i++) {
-          // compare the two promise
-          let tfidf_result = [];
-          let pgrank_result = [];
-          promises_tfidf[i].then(res1 => {
-            promises_pgrank[i].then(res2 => {
-              res1.docs.map(doc => {
-                tfidf_result.push(doc.id);
-              });
-              res2.docs.map(doc => {
-                pgrank_result.push(doc.id);
-              });
-              console.log(queries[i]);
-              console.log(tfidf_result);
-              console.log(pgrank_result);
-              let a = new Set(tfidf_result);
-              let b = new Set(pgrank_result);
-              let intersection = [...a].filter(x => b.has(x));
-              console.log(intersection);
-              console.log(intersection.length);
-            });
-          });
-        }
-      });
-    });
-  }
-
   handleChange(e) {
     this.setState({ [e.target.name]: e.target.value});
   }
