@@ -12,7 +12,7 @@ class App extends React.Component {
     this.state = {
       query: '',
       docs: [],
-      solr: solwr.core('news')
+      solr: solwr.core('news2')
     };
     this.handleChange = this.handleChange.bind(this);
     this.handleSubmit = this.handleSubmit.bind(this);
@@ -40,7 +40,6 @@ class App extends React.Component {
     let promises_tfidf = [];
     let promises_pgrank = [];
 
-
     queries.map(query => {
       promises_tfidf.push(solr.find(query).fieldlist("id").exec());
       promises_pgrank.push(solr.find(query).fieldlist("id").sort("pageRankFile desc").exec());
@@ -62,6 +61,8 @@ class App extends React.Component {
                 pgrank_result.push(doc.id);
               });
               console.log(queries[i]);
+              console.log(tfidf_result);
+              console.log(pgrank_result);
               let a = new Set(tfidf_result);
               let b = new Set(pgrank_result);
               let intersection = [...a].filter(x => b.has(x));
