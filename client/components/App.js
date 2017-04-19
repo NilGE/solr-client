@@ -1,6 +1,10 @@
 import React from 'react';
 import solwr from 'solwr';
 import axios from 'axios';
+import {asyncContainer, Typeahead} from 'react-bootstrap-typeahead';
+const AsyncTypeahead = asyncContainer(Typeahead);
+
+import Input from 'react-input-datalist';
 
 class App extends React.Component {
   constructor(props) {
@@ -12,25 +16,20 @@ class App extends React.Component {
     this.state = {
       query: '',
       docs: [],
-      solr: solwr.core('news2')
+      solr: solwr.core('news2'),
+      options: [],
+      spellCorrect: true,
+      correctedQuery: ''
     };
     this.handleChange = this.handleChange.bind(this);
     this.handleSubmit = this.handleSubmit.bind(this);
     this.handleSelect = this.handleSelect.bind(this);
-  }
-
-  handleSubmit(e) {
-    e.preventDefault();
-    let solr = this.state.solr;
-    let sortContent = document.getElementById('sort-selector').innerHTML == 'Page Rank' ? 'pageRankFile desc' : '';
-    solr.find(this.state.query).sort(sortContent).exec().then(res => {
-      console.log(res);
-      this.setState({docs:res.docs})
-    }).catch(err => console.error(err));
+    this.handleSearch = this.handleSearch.bind(this);
+    this.handleFilter = this.handleFilter.bind(this);
   }
 
   componentDidMount() {
-    this.compareResult();
+    // this.compareResult();
   }
 
   compareResult() {
@@ -75,18 +74,90 @@ class App extends React.Component {
     });
   }
 
-  handleChange(e) {
-    this.setState({ [e.target.name]: e.target.value});
+  handleChange(selectedItems) {
+    this.setState({query: selectedItems[0]})
+  }
+
+  // handleChange(query) {
+  //   console.log(query);
+  //   this.setState({query:query})
+  //   let solr = this.state.solr;
+  //   solr.suggest(query).exec().then(res => {
+  //     let options = [];
+  //     res.suggest[query].suggestions.map(candidate => {
+  //       options.push(candidate.term);
+  //       console.log(candidate.term);
+  //     });
+  //     this.setState({options: options})
+  //   }).catch(err => console.log(err));
+  // }
+
+  handleSearch(query) {
+    if (!query) {
+      return;
+    }
+    let solr = this.state.solr;
+    solr.suggest(query).exec().then(res => {
+      let options = [];
+      res.suggest[query].suggestions.map(candidate => {
+        options.push(candidate.term);
+      });
+      this.setState({options: options})
+      this.setState({query: query})
+    }).catch(err => console.log(err));
   }
 
   handleSelect(e) {
     document.getElementById('sort-selector').innerHTML = e.target.innerHTML;
   }
 
+  handleFilter(option, text) {
+    return (option);
+  }
+
+  handleSubmit(e) {
+    e.preventDefault();
+    let query = this.state.query;
+    let words = query.split(/\s+/);
+    let promises_spellcheck = [];
+    words.map(word => {
+      promises_spellcheck.push(axios.post('/api/spellcheck', {query: word}));
+    });
+    let spellCorrect = true;
+    axios.all(promises_spellcheck).then(responses => {
+      let results = [];
+      let correctedQuery = [];
+      for (let i = 0; i < responses.length; i++) {
+        let curr = responses[i].data;
+        results.push(curr);
+        if (curr != words[i]) {
+          spellCorrect = false;
+          correctedQuery.push('<b><i>' + curr + '</i></b>')
+        } else {
+          correctedQuery.push(curr);
+        }
+      }
+      query = results.join(' ');
+      if (!spellCorrect) {
+        correctedQuery = correctedQuery.join(' ');
+        this.setState({correctedQuery: correctedQuery});
+      }
+      this.setState({spellCorrect: spellCorrect});
+
+      console.log('query: ' + query);
+      let solr = this.state.solr;
+      let sortContent = document.getElementById('sort-selector').innerHTML == 'Page Rank' ? 'pageRankFile desc' : '';
+      solr.find(query).sort(sortContent).exec().then(res => {
+        console.log(res);
+        this.setState({docs:res.docs})
+      }).catch(err => console.error(err));
+    }).catch(err => console.log(err));
+  }
+
   render() {
     return (
       <div className="search-input">
-        <form onSubmit={this.handleSubmit} >
+        <form onSubmit={this.handleSubmit} autoComplete="off">
           <div className="row">
 
             <div className="col-md-6 col-md-offset-3">
@@ -101,12 +172,20 @@ class App extends React.Component {
                     <li><a onClick={this.handleSelect}>Page Rank</a></li>
                   </ul>
                 </span>
-                  <input name="query" type="text" className="form-control input-lg" placeholder="Type what you want to search here" onChange={this.handleChange} />
-                  <span className="input-group-btn">
-                      <button className="btn btn-info btn-lg" type="submit">
-                          Search
-                      </button>
-                  </span>
+                <AsyncTypeahead
+                    filterBy={this.handleFilter}
+                    onSearch={this.handleSearch}
+                    minLength={1}
+                    placeholder="Type what you want to search here"
+                    onChange={this.handleChange}
+                    options={this.state.options}
+                    selected={[]}
+                />
+                <span className="input-group-btn">
+                    <button className="btn btn-info btn-lg" type="submit">
+                        Search
+                    </button>
+                </span>
               </div>
             </div>
         	</div>
@@ -114,7 +193,16 @@ class App extends React.Component {
 
         <br />
         <br />
-
+        {this.state.spellCorrect == true ? '' :
+          <div className="spell-block col-md-10 col-md-offset-1">
+            <div className="spell">
+              Show results for <span id="correct_spell" dangerouslySetInnerHTML = {{ __html: this.state.correctedQuery }}></span>
+            </div>
+            <div className="spell-origin">
+              Search instead for <span id="origin_spell">{this.state.query}</span>
+            </div>
+          </div>
+        }
         {this.state.docs.map(doc => {
           let path = doc.id.split('/');
           return (
