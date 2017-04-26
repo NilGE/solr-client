@@ -96,11 +96,16 @@ class App extends React.Component {
     if (!query) {
       return;
     }
+    let prefix = query;
+    let lastSpaceIdx = query.lastIndexOf(' ')
+    if (lastSpaceIdx >= 0) {
+      prefix = query.slice(lastSpaceIdx + 1);
+    }
     let solr = this.state.solr;
-    solr.suggest(query).exec().then(res => {
+    solr.suggest(prefix).exec().then(res => {
       let options = [];
-      res.suggest[query].suggestions.map(candidate => {
-        options.push(candidate.term);
+      res.suggest[prefix].suggestions.map(candidate => {
+        options.push(query.slice(0, lastSpaceIdx + 1) + candidate.term);
       });
       this.setState({options: options})
       this.setState({query: query})
@@ -141,6 +146,7 @@ class App extends React.Component {
       if (!spellCorrect) {
         correctedQuery = correctedQuery.join(' ');
         this.setState({correctedQuery: correctedQuery});
+        this.setState({errorQuery: this.state.query})
       }
       this.setState({spellCorrect: spellCorrect});
 
@@ -149,7 +155,18 @@ class App extends React.Component {
       let sortContent = document.getElementById('sort-selector').innerHTML == 'Page Rank' ? 'pageRankFile desc' : '';
       solr.find(query).sort(sortContent).exec().then(res => {
         console.log(res);
-        this.setState({docs:res.docs})
+        let docs = res.docs;
+        let promises_snippets = [];
+        docs.map(doc => {
+          promises_snippets.push(axios.post('/api/getSnippet', {id: doc.id, query: query}));
+        });
+        axios.all(promises_snippets).then(responses => {
+          for (let i = 0; i < docs.length; i++) {
+            let str = responses[i].data.match(new RegExp(query, 'i'));
+            docs[i].snippets = responses[i].data.replace(str, '<b>' + str + '</b>');
+          }
+          this.setState({docs:res.docs});
+        }).catch(err => console.error(err));
       }).catch(err => console.error(err));
     }).catch(err => console.log(err));
   }
@@ -179,7 +196,6 @@ class App extends React.Component {
                     placeholder="Type what you want to search here"
                     onChange={this.handleChange}
                     options={this.state.options}
-                    selected={[]}
                 />
                 <span className="input-group-btn">
                     <button className="btn btn-info btn-lg" type="submit">
@@ -199,7 +215,7 @@ class App extends React.Component {
               Show results for <span id="correct_spell" dangerouslySetInnerHTML = {{ __html: this.state.correctedQuery }}></span>
             </div>
             <div className="spell-origin">
-              Search instead for <span id="origin_spell">{this.state.query}</span>
+              Search instead for <span id="origin_spell">{this.state.errorQuery}</span>
             </div>
           </div>
         }
@@ -221,6 +237,9 @@ class App extends React.Component {
                   </p>
                   <p>
                     <b>Url: </b> <a href={doc.og_url}>{doc.og_url}</a>
+                  </p>
+                  <p>
+                    { doc.snippets == '' ? '' : <span><b>Snippets: </b> ... <span dangerouslySetInnerHTML= {{ __html: doc.snippets }}></span> ... </span> }
                   </p>
               </div>
               <hr />
